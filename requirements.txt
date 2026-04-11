@@ -1,0 +1,8 @@
+numpy==1.26.4
+opencv-python==4.9.0.80
+mediapipe==0.10.9
+matplotlib==3.7.5
+pillow==10.3.0
+pyautogui==0.9.54
+selenium==4.15.2
+webdriver-manager==4.0.1
