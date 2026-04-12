@@ -25,7 +25,7 @@ A Python-based application that allows you to control Instagram Reels using hand
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/gesture-based-reel-scroller.git
+   git clone https://github.com/VipulBhattt/gesture-based-reel-inetraction-system.git
    cd gesture-based-reel-scroller
    ```
 
@@ -83,9 +83,6 @@ This project is under active development. Contributions are welcome! Please:
 - `debug_dom.py`: DOM verification script.
 - `requirements.txt`: Python dependencies.
 
-## License
-
-[Specify your license here, e.g., MIT License]
 
 ## Disclaimer
 
