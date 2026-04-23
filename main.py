@@ -3,7 +3,8 @@ import mediapipe as mp
 import time
 from collections import deque
 from selenium.webdriver.common.by import By
-
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 from config import (
     POSE_HOLD_TIME, SWIPE_THRESHOLD, SCROLL_COOLDOWN,
     TOGGLE_COOLDOWN, STARTUP_GRACE_PERIOD,
@@ -43,16 +44,10 @@ def fingers_up(hand_landmarks, hand_label):
 
     return fingers
 
-
+#SEPRATED UP AND DOWNSCROLL GESTURE use one finger for up and two for downscroll
 def detect_pose(fingers):
     """
     Map finger state to a named pose.
-
-    [thumb, index, middle, ring, pinky]
-    [1,1,1,1,1] → open hand       → PAUSE/PLAY
-    [0,0,0,0,0] → closed fist     → MUTE/UNMUTE
-    [1,0,0,0,0] → thumbs up       → LIKE
-    [0,1,1,1,1] → thumbs down     → DISLIKE (all fingers up except thumb)
     """
     if fingers == [1, 1, 1, 1, 1]:
         return "PAUSE/PLAY"
@@ -60,24 +55,45 @@ def detect_pose(fingers):
         return "MUTE/UNMUTE"
     elif fingers == [1, 0, 0, 0, 0]:
         return "LIKE"
-    elif fingers == [0, 1, 1, 1, 1]:
-        return "DISLIKE"
+    elif fingers == [0, 1, 0, 0, 0]:    # <--- ADDED: 1 Finger (Index)
+        return "ONE_FINGER"
+    elif fingers == [0, 1, 1, 0, 0]:    # <--- ADDED: 2 Fingers (Index + Middle)
+        return "TWO_FINGERS"
     return "NONE"
 
 
+
+
 def detect_swipe(index_history):
-    """Detect vertical swipe from index-finger position history."""
-    if len(index_history) < index_history.maxlen:
+    if len(index_history) < 8:
         return "NONE"
 
-    start_y = sum(p[1] for p in list(index_history)[:3]) / 3
-    end_y   = sum(p[1] for p in list(index_history)[-3:]) / 3
-    dy      = end_y - start_y
+    ys = [p[1] for p in index_history]
 
+    dy = ys[-1] - ys[0]
+    total_frames = len(ys)
+
+    # velocity check (important)
+    velocity = abs(dy) / total_frames
+
+    if velocity < 0.008:
+        return "NONE"
+
+    # direction consistency check
+    directions = [ys[i+1] - ys[i] for i in range(len(ys)-1)]
+
+    positive = sum(1 for d in directions if d > 0)
+    negative = sum(1 for d in directions if d < 0)
+
+    if max(positive, negative) < len(directions) * 0.60:
+        return "NONE"
+
+    # final swipe decision
     if dy < -SWIPE_THRESHOLD:
         return "SCROLL UP"
     elif dy > SWIPE_THRESHOLD:
         return "SCROLL DOWN"
+
     return "NONE"
 
 
@@ -96,15 +112,18 @@ _VISIBLE_VIDEO_JS = """
 
 def _scroll_reels(driver, direction):
     try:
-        height = driver.execute_script("return window.innerHeight;")
-        scroll_amount = -height if direction == "UP" else height
-        driver.execute_script(
-            "window.scrollBy({top: arguments[0], behavior: 'smooth'});",
-            scroll_amount
-        )
-        arrow = "↑" if direction == "UP" else "↓"
-        print(f"{arrow} Scrolled {direction}")
-        time.sleep(0.8)
+        # Create an ActionChains object to simulate real human keyboard presses rather than injecting into html
+        actions = ActionChains(driver)
+        
+        if direction == "UP":
+            actions.send_keys(Keys.ARROW_UP).perform()
+            print("↑ Scrolled UP")
+        else:
+            actions.send_keys(Keys.ARROW_DOWN).perform()
+            print("↓ Scrolled DOWN")
+            
+        # I removed time.sleep() here so the camera never freezes!
+            
     except Exception as e:
         print(f"Scroll {direction} failed: {e}")
 
@@ -220,34 +239,12 @@ def _like_reel(driver):
         print(f"❤ LIKE failed: {result}")
 
 
-def _dislike_reel(driver):
-    """
-    Remove like from the current reel (thumbs down gesture).
-    Only works if the reel is already liked (Unlike SVG present).
-    """
-    result = _click_heart_button(driver, 'Unlike')
-    if result == 'ok':
-        print("💔 UNLIKED")
-    elif result == 'no-svg':
-        # Reel is not liked yet
-        check = driver.execute_script(
-            "return document.querySelectorAll(\"svg[aria-label='Like']\").length;"
-        )
-        if check > 0:
-            print("💔 Not liked yet — nothing to unlike")
-        else:
-            print("💔 DISLIKE failed: Neither Like nor Unlike button found")
-    else:
-        print(f"💔 DISLIKE failed: {result}")
-
-
 def perform_action(driver, action):
     """Route a gesture action to the correct browser interaction."""
     try:
         driver.switch_to.window(driver.current_window_handle)
         driver.execute_script("window.focus();")
-        time.sleep(0.1)
-
+        
         if action == "SCROLL UP":
             _scroll_reels(driver, "UP")
         elif action == "SCROLL DOWN":
@@ -258,10 +255,6 @@ def perform_action(driver, action):
             _toggle_mute(driver)
         elif action == "LIKE":
             _like_reel(driver)
-        elif action == "DISLIKE":
-            _dislike_reel(driver)
-
-        time.sleep(0.2)
 
     except Exception as e:
         print(f"perform_action error for '{action}': {e}")
@@ -301,11 +294,11 @@ def start_gesture_control(driver):
     startup_time      = time.time()
 
     print("\n=== GESTURE CONTROL STARTED ===")
-    print("  Swipe Up / Down  →  Scroll reels")
-    print("  Open Hand        →  Pause / Play")
-    print("  Closed Fist      →  Mute / Unmute")
-    print("  Thumbs Up        →  Like ❤")
-    print("  Thumbs Down      →  Unlike 💔 (only if already liked)")
+    print("  One Finger (Index)     →  Scroll UP")
+    print("  Two Fingers (Index+Mid)→  Scroll DOWN")
+    print("  Open Hand              →  Pause / Play")
+    print("  Closed Fist            →  Mute / Unmute")
+    print("  Thumbs Up              →  Like ❤")
     print("Press 'q' in the camera window to quit.\n")
 
     while True:
@@ -333,8 +326,34 @@ def start_gesture_control(driver):
             pose_name  = detect_pose(fingers)
 
             index_tip = hand_landmarks.landmark[8]
-            index_history.append((index_tip.x, index_tip.y))
-            swipe_name = detect_swipe(index_history)
+
+            # Smooth Y movement
+            # Only track movement if 1 or 2 fingers are up
+            if pose_name in ["ONE_FINGER", "TWO_FINGERS"]:
+                index_tip = hand_landmarks.landmark[8]
+
+                # Keep your Smooth Y movement
+                if len(index_history) > 0:
+                    prev_x, prev_y = index_history[-1]
+                    smooth_y = 0.7 * prev_y + 0.3 * index_tip.y
+                    smooth_x = 0.7 * prev_x + 0.3 * index_tip.x
+                else:
+                    smooth_x, smooth_y = index_tip.x, index_tip.y
+
+                index_history.append((smooth_x, smooth_y))
+                raw_swipe = detect_swipe(index_history)
+
+                # Filter the direction based on finger count
+                if raw_swipe == "SCROLL DOWN" and pose_name == "TWO_FINGERS":
+                    swipe_name = "SCROLL DOWN"
+                elif raw_swipe == "SCROLL UP" and pose_name == "ONE_FINGER":
+                    swipe_name = "SCROLL UP"
+                else:
+                    swipe_name = "NONE" # Ignore the return strokes
+            else:
+                # Clear history if using a different pose (fist, open hand, etc.)
+                index_history.clear()
+                swipe_name = "NONE"
 
             # ── Swipe (higher priority than pose) ─────────────────
             if swipe_name != "NONE":

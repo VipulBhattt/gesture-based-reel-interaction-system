@@ -7,11 +7,11 @@ A Python-based application that allows you to control Instagram Reels using hand
 - **Gesture Recognition**: Detects hand gestures using MediaPipe and OpenCV.
 - **Browser Automation**: Uses Selenium to interact with Instagram Reels in a web browser.
 - **Supported Gestures**:
-  - Swipe Up/Down: Scroll through reels.
+  - One Finger (Index): Scroll up through reels.
+  - Two Fingers (Index + Middle): Scroll down through reels.
   - Open Hand: Pause/Play video.
   - Closed Fist: Mute/Unmute video.
   - Thumbs Up: Like the current reel.
-  - Thumbs Down: Unlike the current reel (if already liked).
 - **Real-time Feedback**: Displays gesture status in a camera window.
 
 ## Requirements
@@ -25,7 +25,7 @@ A Python-based application that allows you to control Instagram Reels using hand
 
 1. Clone the repository:
    ```
-   git clone https://github.com/VipulBhattt/gesture-based-reel-inetraction-system.git
+   git clone https://github.com/VipulBhattt/gesture-based-reel-interaction-system.git
    cd gesture-based-reel-scroller
    ```
 
@@ -59,7 +59,12 @@ A Python-based application that allows you to control Instagram Reels using hand
 
 3. The browser will open Instagram Reels. Log in if prompted.
 
-4. A camera window will appear. Perform gestures in front of the camera to control the reels.
+4. A camera window will appear. Perform the following gestures in front of the camera to control the reels:
+   - One Finger (Index): Scroll up through reels.
+   - Two Fingers (Index + Middle): Scroll down through reels.
+   - Open Hand (all fingers extended): Pause/Play video.
+   - Closed Fist (all fingers closed): Mute/Unmute video.
+   - Thumbs Up: Like the current reel.
 
 5. Press 'q' in the camera window to exit.
 
